@@ -88,7 +88,7 @@ function ResultContent() {
 
   const handleNewArt = () => {
     sessionStorage.removeItem(`result_${id}`);
-    router.push('/');
+    router.push('/olustur');
   };
 
   if (!data) {

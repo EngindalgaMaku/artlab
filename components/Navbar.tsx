@@ -47,7 +47,7 @@ export default function Navbar() {
 
         {/* Center: Nav links */}
         <div className="hidden md:flex items-center gap-6 text-sm font-medium">
-          <a href="/" className="text-white/70 hover:text-cyan-400 transition-colors">3 Kelime 1 Şaheser</a>
+          <a href="/olustur" className="text-white/70 hover:text-cyan-400 transition-colors">3 Kelime 1 Şaheser</a>
           <a href="/demo" className="text-white/70 hover:text-cyan-400 transition-colors">Prompt Atölyesi</a>
           <a href="/gallery" className="text-white/70 hover:text-cyan-400 transition-colors">Galeri</a>
           <a href="/stats" className="text-white/70 hover:text-cyan-400 transition-colors">İstatistikler</a>
