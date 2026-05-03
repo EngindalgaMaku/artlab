@@ -1,0 +1,42 @@
+// Bellekte onay kuyruğu — sunucu yeniden başlatılana kadar saklanır
+export interface PendingItem {
+  id: string;
+  words: [string, string, string];
+  templateName: string;
+  templateNameTr: string;
+  templateCategory: string;
+  prompt: string;
+  imageBase64: string;
+  createdAt: number;
+  status: 'pending' | 'approved' | 'rejected';
+  creatorName?: string;
+}
+
+// Next.js hot-reload sırasında global objeyi koru
+const g = global as any;
+if (!g._pendingStore) g._pendingStore = { items: [] as PendingItem[] };
+const store: { items: PendingItem[] } = g._pendingStore;
+
+export function addPending(item: PendingItem) {
+  store.items.unshift(item);
+  if (store.items.length > 50) store.items = store.items.slice(0, 50);
+}
+
+export function getPending(): PendingItem[] {
+  return store.items;
+}
+
+export function updateStatus(id: string, status: 'approved' | 'rejected'): PendingItem | null {
+  const item = store.items.find((i) => i.id === id);
+  if (!item) return null;
+  item.status = status;
+  return item;
+}
+
+export function getApproved(): PendingItem[] {
+  return store.items.filter((i) => i.status === 'approved');
+}
+
+export function getById(id: string): PendingItem | null {
+  return store.items.find((i) => i.id === id) ?? null;
+}
