@@ -6,7 +6,7 @@ export default function DemoPage() {
       <div className="glass border-b border-white/10 px-8 py-4 flex items-center justify-between">
         <div>
           <span className="text-cyan-400 font-bold text-lg">AI ArtLab</span>
-          <span className="text-white/30 text-sm ml-3">Gelişmiş Demo</span>
+          <span className="text-white/30 text-sm ml-3">Prompt Atölyesi</span>
         </div>
         <a
           href="/"
