@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Sparkles, RefreshCw, Clock, Wand2, User, Download } from 'lucide-react';
+import { addWatermark } from '@/lib/addWatermark';
 
 const THEMES = [
   { value: 'kültür', label: '🏛️ Kültür', desc: 'Anadolu, gelenek' },
@@ -37,7 +38,7 @@ const STATUS_LABELS = [
   'Görsel tamamlandı!',
 ];
 
-type Phase = 'idle' | 'generating' | 'polling' | 'done' | 'error';
+type Phase = 'idle' | 'generating' | 'submitted' | 'polling' | 'done' | 'error';
 
 export default function InteractiveDemo() {
   const [theme, setTheme] = useState('kültür');
@@ -71,33 +72,27 @@ export default function InteractiveDemo() {
     if (progressRef.current) { clearInterval(progressRef.current); progressRef.current = null; }
   }, []);
 
-  // Polling: submission ID'ye bakarak imageBase64 geldi mi kontrol et
-  const startPolling = useCallback((id: string) => {
-    let attempts = 0;
-    const MAX = 30; // 30 × 2sn = 60 sn max
-    pollingRef.current = setInterval(async () => {
-      attempts++;
-      try {
-        const res = await fetch(`/api/submission/${id}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.imageBase64) {
-          stopPolling();
-          stopProgress();
-          setProgress(100);
-          setStatusLabel('Görsel tamamlandı!');
-          setImageSrc(`data:image/png;base64,${data.imageBase64}`);
-          setPhase('done');
-          setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
-        } else if (attempts >= MAX) {
-          stopPolling();
-          stopProgress();
-          setPhase('error');
-          setErrorMsg('Görsel üretimi zaman aşımına uğradı. Lütfen tekrar deneyin.');
-        }
-      } catch { /* sessizce devam et */ }
-    }, 2000);
-  }, [stopPolling, stopProgress]);
+  // Manuel kontrol: admin onayladı mı?
+  const [checking, setChecking] = useState(false);
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
+
+  const checkApproval = useCallback(async (id: string) => {
+    setChecking(true);
+    try {
+      const res = await fetch(`/api/submission/${id}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.imageReady && data.imageBase64) {
+        const watermarked = await addWatermark(data.imageBase64, creatorName, 'AI ArtLab');
+        setImageSrc(watermarked);
+        setPhase('done');
+        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+      }
+      setLastChecked(new Date());
+    } catch { /* sessizce devam et */ } finally {
+      setChecking(false);
+    }
+  }, []);
 
   const generate = async () => {
     setPhase('generating');
@@ -137,10 +132,10 @@ export default function InteractiveDemo() {
         return;
       }
 
+      stopProgress();
       setSubmissionId(data.id);
       setFinalPrompt(data.prompt);
-      setPhase('polling');
-      startPolling(data.id);
+      setPhase('submitted');
     } catch {
       stopProgress();
       setPhase('error');
@@ -164,7 +159,7 @@ export default function InteractiveDemo() {
   // Temizlik
   useEffect(() => () => { stopPolling(); stopProgress(); }, [stopPolling, stopProgress]);
 
-  const isGenerating = phase === 'generating' || phase === 'polling';
+  const isGenerating = phase === 'generating';
 
   return (
     <section className="max-w-7xl mx-auto px-6 py-16">
@@ -344,7 +339,39 @@ export default function InteractiveDemo() {
 
         {/* ─── SONUÇ ALANI ─── */}
         <div ref={resultRef} className="glass rounded-3xl p-6 neon-border min-h-[600px] flex flex-col">
-          {phase === 'done' && imageSrc ? (
+          {phase === 'submitted' ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center">
+              <div className="relative w-28 h-28">
+                <div className="absolute inset-0 rounded-full border-4 border-white/5" />
+                <div className="absolute inset-0 rounded-full border-4 border-transparent"
+                  style={{ borderTopColor: '#00f0ff', animation: 'spin 2s linear infinite' }} />
+                <div className="absolute inset-5 rounded-full bg-cyan-500/10 flex items-center justify-center">
+                  <Clock className="w-9 h-9 text-cyan-400/60" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold text-white">Eseriniz Hazırlanıyor</h3>
+                <p className="text-white/40 text-sm leading-relaxed max-w-xs">
+                  Promptunuz gönderildi. Görsel üretildikten sonra<br />
+                  admin ekibinin onaylaması gerekiyor.
+                </p>
+              </div>
+              {lastChecked && (
+                <p className="text-white/20 text-xs">
+                  Son kontrol: {lastChecked.toLocaleTimeString('tr-TR')}
+                </p>
+              )}
+              <button
+                onClick={() => checkApproval(submissionId)}
+                disabled={checking}
+                className="flex items-center gap-2 px-6 py-3 btn-neon rounded-2xl font-semibold text-sm disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
+                {checking ? 'Kontrol ediliyor…' : 'Yenile & Kontrol Et'}
+              </button>
+              <p className="text-white/20 text-xs">Admin onayladıktan sonra butonuna bas</p>
+            </div>
+          ) : phase === 'done' && imageSrc ? (
             <div className="flex flex-col h-full gap-4">
               {/* Başlık */}
               <div className="flex items-center justify-between">

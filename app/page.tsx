@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Sparkles, AlertCircle, ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
+import { Sparkles, AlertCircle, ArrowLeft, ArrowRight, RotateCcw, Info } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import StylePicker from '@/components/StylePicker';
@@ -156,6 +156,7 @@ export default function Home() {
         style: style.nametr,
         category: style.artist,
         w1: words[0], w2: words[1], w3: words[2],
+        ...(creatorName.trim() ? { name: creatorName.trim() } : {}),
       });
       sessionStorage.setItem(`result_${data.id}`, JSON.stringify(data));
 
@@ -199,7 +200,7 @@ export default function Home() {
       )}
 
       {/* ─── ADIM GÖSTERGESİ ─── */}
-      <div className="flex items-center justify-center gap-3 pt-8 pb-2">
+      <div className="flex items-center justify-center gap-3 pt-3 pb-1">
         {[
           { key: 'words', label: '1. Kelimeler' },
           { key: 'style', label: '2. Stil Seç' },
@@ -229,38 +230,43 @@ export default function Home() {
 
       {/* ─── ADIM 1: 3 KELİME ─── */}
       {step === 'words' && (
-        <section className="flex flex-col items-center justify-center min-h-[80vh] px-6 text-center">
+        <section className="flex flex-col items-center justify-center px-6 text-center" style={{ minHeight: 'calc(100vh - 120px)' }}>
           <div className="absolute top-1/3 left-1/4 w-64 h-64 rounded-full bg-cyan-500/5 blur-3xl pointer-events-none" />
           <div className="absolute bottom-1/3 right-1/4 w-64 h-64 rounded-full bg-purple-500/5 blur-3xl pointer-events-none" />
 
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/15 text-xs mb-4">
-            <Sparkles className="w-3 h-3 text-orange-400" />
-            <span className="text-white/60">TÜBİTAK 4006 Bilim Fuarı • 2026</span>
+          {/* Başlık satırı — badge + okul + info ikonu yan yana */}
+          <div className="flex items-center gap-3 mb-4 flex-wrap justify-center">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/15 text-xs">
+              <Sparkles className="w-3 h-3 text-orange-400" />
+              <span className="text-white/60">TÜBİTAK 4006 • 2026</span>
+            </div>
+            <span className="text-white/25 text-xs hidden sm:inline">·</span>
+            <span className="text-white/30 text-xs hidden sm:inline">Hüsniye Özdilek Ticaret MTAL</span>
+            {/* Proje amacı tooltip */}
+            <div className="relative group">
+              <button className="p-1.5 rounded-full bg-white/5 border border-white/15 text-white/30 hover:text-cyan-400 hover:border-cyan-400/30 transition-all">
+                <Info className="w-3.5 h-3.5" />
+              </button>
+              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-72 glass border border-white/15 rounded-2xl p-4 text-left text-xs leading-relaxed text-white/60 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 shadow-xl">
+                <p className="font-semibold text-white/80 mb-1 flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3 text-cyan-400" /> Bu proje ne amaçla yapıldı?
+                </p>
+                Yapay zekânın sanatla buluştuğu noktayı keşfetmek için tasarlandı.
+                3 kelime ve bir sanat akımı seçerek yapay zekâya özgün tablo ürettiriyorsunuz. Böylece{' '}
+                <span className="text-cyan-400/80">prompt mühendisliği</span>,{' '}
+                <span className="text-purple-400/80">üretici yapay zekâ</span> ve{' '}
+                <span className="text-orange-400/80">sanat tarihi</span> bir arada deneyimleniyor.
+              </div>
+            </div>
           </div>
 
-          <p className="text-white/30 text-sm mb-8">Hüsniye Özdilek Ticaret Mesleki ve Teknik Anadolu Lisesi</p>
-
-          <h1 className="text-5xl md:text-7xl font-black neon-text mb-3 leading-none">3 Kelime</h1>
-          <h2 className="text-2xl md:text-4xl font-bold text-orange-400 mb-6">1 Şaheser</h2>
-
-          {/* Proje amacı */}
-          <div className="glass border border-white/10 rounded-2xl px-6 py-4 max-w-lg mb-10 text-left space-y-2">
-            <p className="text-white/70 text-sm font-semibold flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-cyan-400 flex-shrink-0" />
-              Bu proje ne amaçla yapıldı?
-            </p>
-            <p className="text-white/45 text-sm leading-relaxed">
-              Bu çalışma, yapay zekânın sanatla buluştuğu noktayı keşfetmek için tasarlandı.
-              Ziyaretçiler 3 kelime ve bir sanat akımı seçerek yapay zekâya özgün bir tablo ürettiriyor.
-              Böylece <span className="text-cyan-400/80">prompt mühendisliği</span>, <span className="text-purple-400/80">üretici yapay zekâ</span> ve
-              <span className="text-orange-400/80"> sanat tarihi</span> bir arada deneyimleniyor.
-            </p>
-          </div>
+          <h1 className="text-5xl md:text-6xl font-black neon-text mb-1 leading-none">3 Kelime</h1>
+          <h2 className="text-xl md:text-3xl font-bold text-orange-400 mb-5">1 Şaheser</h2>
 
           <div className="w-full max-w-xl">
-            <div className="grid grid-cols-3 gap-4 mb-5">
+            <div className="grid grid-cols-3 gap-3 mb-4">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="flex flex-col gap-2">
+                <div key={i} className="flex flex-col gap-1.5">
                   <label className="text-xs text-white/40 uppercase tracking-widest text-center">
                     {WORD_LABELS[i]}
                   </label>
@@ -272,29 +278,26 @@ export default function Home() {
                     onKeyDown={(e) => handleKeyDown(i, e)}
                     placeholder={WORD_PLACEHOLDERS[i]}
                     maxLength={25}
-                    className={`w-full text-center text-xl font-bold py-5 px-3 rounded-2xl bg-white/5 border-2 ${WORD_COLORS[i]} text-white placeholder:text-white/20 focus:outline-none transition-all`}
+                    className={`w-full text-center text-lg font-bold py-4 px-3 rounded-2xl bg-white/5 border-2 ${WORD_COLORS[i]} text-white placeholder:text-white/20 focus:outline-none transition-all`}
                   />
                 </div>
               ))}
             </div>
 
             {/* İsteğe bağlı isim */}
-            <div className="mb-5">
-              <label className="text-xs text-white/30 uppercase tracking-widest block text-center mb-2">
-                Adın Soyadın <span className="normal-case text-white/20">(isteğe bağlı)</span>
-              </label>
+            <div className="mb-4">
               <input
                 type="text"
                 value={creatorName}
                 onChange={(e) => setCreatorName(e.target.value)}
-                placeholder="Galeride görünmesini istiyorsan yaz"
+                placeholder="Adın Soyadın (isteğe bağlı — galeride görünür)"
                 maxLength={40}
-                className="w-full text-center py-3.5 px-4 rounded-2xl bg-white/5 border border-white/15 text-white placeholder:text-white/20 focus:outline-none focus:border-white/35 transition-all text-sm"
+                className="w-full text-center py-3 px-4 rounded-2xl bg-white/5 border border-white/15 text-white placeholder:text-white/20 focus:outline-none focus:border-white/35 transition-all text-sm"
               />
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 justify-center text-red-400 text-sm mb-4 bg-red-500/10 border border-red-500/20 rounded-xl py-3 px-4">
+              <div className="flex items-center gap-2 justify-center text-red-400 text-sm mb-3 bg-red-500/10 border border-red-500/20 rounded-xl py-3 px-4">
                 <AlertCircle className="w-4 h-4" /> {error}
               </div>
             )}
@@ -302,12 +305,12 @@ export default function Home() {
             <button
               onClick={() => setStep('style')}
               disabled={!wordsValid}
-              className="w-full py-5 text-xl font-black btn-neon rounded-3xl flex items-center justify-center gap-3 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full py-4 text-xl font-black btn-neon rounded-3xl flex items-center justify-center gap-3 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <span>Sanat Tarzı Seç</span>
               <ArrowRight className="w-6 h-6" />
             </button>
-            <p className="text-white/20 text-xs mt-3">
+            <p className="text-white/20 text-xs mt-2">
               10 farklı sanat akımından birini seçeceksin
             </p>
           </div>

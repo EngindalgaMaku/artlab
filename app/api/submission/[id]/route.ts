@@ -14,14 +14,16 @@ export async function GET(
     return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 });
   }
 
+  const approved = item.status === 'approved';
+
   return NextResponse.json({
     id: item.id,
     words: item.words,
     templateNameTr: item.templateNameTr,
     templateCategory: item.templateCategory,
     prompt: item.prompt,
-    imageReady: !!item.imageBase64,
-    imageBase64: item.imageBase64 || null,
+    imageReady: approved && !!item.imageBase64,
+    imageBase64: approved ? (item.imageBase64 || null) : null,
     status: item.status,
     createdAt: item.createdAt,
   });

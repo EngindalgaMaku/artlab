@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPending, updateStatus } from '@/lib/pendingStore';
-import { getPendingFile, updateStatusFile } from '@/lib/fileStore';
+import { getPending, updateStatus, deleteItem } from '@/lib/pendingStore';
+import { getPendingFile, updateStatusFile, deleteItemFile } from '@/lib/fileStore';
 
 // GET /api/pending — kuyruğu getir (dosya öncelikli, fallback bellek)
 export async function GET() {
@@ -23,9 +23,7 @@ export async function PATCH(req: NextRequest) {
   }
   const status = action === 'approve' ? 'approved' : 'rejected';
 
-  // Önce dosyaya yaz
   const fileItem = await updateStatusFile(id, status).catch(() => null);
-  // Bellekte de güncelle
   const memItem = updateStatus(id, status);
 
   const item = fileItem ?? memItem;
@@ -33,4 +31,20 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 });
   }
   return NextResponse.json({ ok: true, item });
+}
+
+// DELETE /api/pending — kalıcı sil
+export async function DELETE(req: NextRequest) {
+  const { id } = await req.json() as { id: string };
+  if (!id) {
+    return NextResponse.json({ error: 'id gerekli' }, { status: 400 });
+  }
+
+  const fileDeleted = await deleteItemFile(id).catch(() => false);
+  const memDeleted = deleteItem(id);
+
+  if (!fileDeleted && !memDeleted) {
+    return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 });
+  }
+  return NextResponse.json({ ok: true });
 }

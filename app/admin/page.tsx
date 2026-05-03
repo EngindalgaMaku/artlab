@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   CheckCircle, XCircle, Clock, RefreshCw, Shield, Eye,
-  Lock, Monitor, Copy, Upload, ImagePlus, Check, AlertCircle
+  Lock, Monitor, Copy, Upload, ImagePlus, Check, AlertCircle, Trash2
 } from 'lucide-react';
 
 interface PendingItem {
@@ -261,6 +261,19 @@ export default function AdminPage() {
     if (preview?.id === id) setPreview(null);
   };
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Bu eseri kalıcı olarak silmek istediğine emin misin?')) return;
+    setActionLoading(id);
+    await fetch('/api/pending', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    await fetchQueue();
+    setActionLoading(null);
+    if (preview?.id === id) setPreview(null);
+  };
+
   const pending = items.filter((i) => i.status === 'pending');
   const approved = items.filter((i) => i.status === 'approved');
   const rejected = items.filter((i) => i.status === 'rejected');
@@ -432,24 +445,35 @@ export default function AdminPage() {
                       </div>
                       <Eye className="w-4 h-4 text-white/20 flex-shrink-0" />
                     </div>
-                    {item.status === 'pending' && (
-                      <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
+                      {item.status === 'pending' && (
+                        <>
+                          <button
+                            onClick={() => handleAction(item.id, 'approve')}
+                            disabled={actionLoading === item.id}
+                            className="flex-1 py-2 rounded-xl bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 text-green-400 text-sm font-semibold flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                          >
+                            <CheckCircle className="w-4 h-4" /> Onayla
+                          </button>
+                          <button
+                            onClick={() => handleAction(item.id, 'reject')}
+                            disabled={actionLoading === item.id}
+                            className="flex-1 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 text-sm font-semibold flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                          >
+                            <XCircle className="w-4 h-4" /> Reddet
+                          </button>
+                        </>
+                      )}
+                      {item.status === 'approved' && (
                         <button
-                          onClick={() => handleAction(item.id, 'approve')}
+                          onClick={() => handleDelete(item.id)}
                           disabled={actionLoading === item.id}
-                          className="flex-1 py-2 rounded-xl bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 text-green-400 text-sm font-semibold flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                          className="flex-1 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400/70 hover:text-red-400 text-sm font-semibold flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
                         >
-                          <CheckCircle className="w-4 h-4" /> Onayla
+                          <Trash2 className="w-4 h-4" /> Kalıcı Sil
                         </button>
-                        <button
-                          onClick={() => handleAction(item.id, 'reject')}
-                          disabled={actionLoading === item.id}
-                          className="flex-1 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 text-sm font-semibold flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
-                        >
-                          <XCircle className="w-4 h-4" /> Reddet
-                        </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -500,6 +524,15 @@ export default function AdminPage() {
                           <XCircle className="w-5 h-5" />
                         </button>
                       </div>
+                    )}
+                    {preview.status === 'approved' && (
+                      <button
+                        onClick={() => handleDelete(preview.id)}
+                        disabled={actionLoading === preview.id}
+                        className="w-full py-3 rounded-2xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400/70 hover:text-red-400 font-bold flex items-center justify-center gap-2 transition-all text-sm disabled:opacity-50"
+                      >
+                        <Trash2 className="w-4 h-4" /> Kalıcı Sil
+                      </button>
                     )}
                   </div>
                 </div>

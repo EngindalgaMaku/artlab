@@ -68,3 +68,12 @@ export async function updateImageBase64File(
   await writeFile(items);
   return item;
 }
+
+export async function deleteItemFile(id: string): Promise<boolean> {
+  const items = await readFile();
+  const idx = items.findIndex((i) => i.id === id);
+  if (idx === -1) return false;
+  items.splice(idx, 1);
+  await writeFile(items);
+  return true;
+}

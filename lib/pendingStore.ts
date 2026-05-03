@@ -40,3 +40,10 @@ export function getApproved(): PendingItem[] {
 export function getById(id: string): PendingItem | null {
   return store.items.find((i) => i.id === id) ?? null;
 }
+
+export function deleteItem(id: string): boolean {
+  const idx = store.items.findIndex((i) => i.id === id);
+  if (idx === -1) return false;
+  store.items.splice(idx, 1);
+  return true;
+}

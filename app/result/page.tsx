@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Download, Sparkles, RefreshCw, Clock, CheckCircle } from 'lucide-react';
 import QRCode from 'qrcode';
+import { addWatermark } from '@/lib/addWatermark';
 
 interface ResultData {
   id: string;
@@ -29,6 +30,7 @@ function ResultContent() {
   const w1 = params.get('w1') ?? '';
   const w2 = params.get('w2') ?? '';
   const w3 = params.get('w3') ?? '';
+  const creatorName = params.get('name') ?? '';
 
   // Sunucudan güncel durumu çek
   const checkStatus = useCallback(async (silent = false) => {
@@ -40,7 +42,12 @@ function ResultContent() {
         const fresh = await res.json() as ResultData;
         setData(fresh);
         if (fresh.imageReady && fresh.imageBase64) {
-          setImgSrc(`data:image/png;base64,${fresh.imageBase64}`);
+          const watermarked = await addWatermark(
+            fresh.imageBase64,
+            creatorName,
+            'AI ArtLab'
+          );
+          setImgSrc(watermarked);
         }
         setLastChecked(new Date());
       }
@@ -60,7 +67,7 @@ function ResultContent() {
         setData({ ...parsed, imageBase64: null, imageReady: false });
       } catch {}
     }
-    // Sunucudan taze veri çek (görsel dahil)
+    // Sunucudan taze veri çek (görsel dahil — watermark ile)
     checkStatus(true);
 
     const qrText = `AI ArtLab – TÜBİTAK 4006\nKelimeler: ${w1} · ${w2} · ${w3}\nStil: ${style}`;
@@ -209,6 +216,14 @@ function ResultContent() {
             <p className="text-xs text-white/40 mb-1">Seçilen Stil</p>
             <p className="text-lg font-bold text-white">{style || data.templateNameTr}</p>
             <p className="text-xs text-white/40 mt-0.5">{category || data.templateCategory}</p>
+          </div>
+
+          {/* Oluşturan */}
+          <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+            <p className="text-xs text-white/40 mb-1">Oluşturan</p>
+            <p className={`text-lg font-bold ${creatorName ? 'text-white' : 'text-white/25 italic'}`}>
+              {creatorName || 'İsimsiz'}
+            </p>
           </div>
 
           {/* Prompt */}

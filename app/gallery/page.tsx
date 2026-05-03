@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { Sparkles, X, Clock, Palette, ChevronLeft, User } from 'lucide-react';
+import { Sparkles, X, Clock, Palette, ChevronLeft, ChevronRight, User, ZoomIn } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
@@ -73,11 +73,41 @@ function ArtCard({ item, onClick }: { item: ApprovedItem; onClick: () => void })
 }
 
 function Modal({ item, onClose }: { item: ApprovedItem; onClose: () => void }) {
+  const [zoomed, setZoomed] = useState(false);
+
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { if (zoomed) setZoomed(false); else onClose(); }
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  }, [onClose, zoomed]);
+
+  const imgSrc = `data:image/png;base64,${item.imageBase64}`;
+
+  // Tam ekran zoom katmanı
+  if (zoomed) {
+    return (
+      <div
+        className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center cursor-zoom-out"
+        onClick={() => setZoomed(false)}
+      >
+        <button
+          onClick={() => setZoomed(false)}
+          className="absolute top-4 right-4 p-2 rounded-xl glass border border-white/20 text-white/60 hover:text-white transition-colors z-10"
+        >
+          <X className="w-6 h-6" />
+        </button>
+        <img
+          src={imgSrc}
+          alt={item.words.join(', ')}
+          className="max-h-screen max-w-screen object-contain p-4"
+          style={{ maxHeight: '95vh', maxWidth: '95vw' }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -89,12 +119,20 @@ function Modal({ item, onClose }: { item: ApprovedItem; onClose: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Görsel */}
-        <div className="flex-shrink-0 lg:w-1/2 bg-black/40 flex items-center justify-center p-4">
+        <div
+          className="flex-shrink-0 lg:w-1/2 bg-black/40 flex items-center justify-center p-4 relative group cursor-zoom-in"
+          onClick={() => setZoomed(true)}
+        >
           <img
-            src={`data:image/png;base64,${item.imageBase64}`}
+            src={imgSrc}
             alt={item.words.join(', ')}
             className="max-h-[60vh] lg:max-h-[80vh] rounded-2xl object-contain result-glow"
           />
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl bg-black/20">
+            <div className="bg-black/60 rounded-full p-3 border border-white/20">
+              <ZoomIn className="w-6 h-6 text-white" />
+            </div>
+          </div>
         </div>
 
         {/* Detaylar */}
@@ -167,6 +205,8 @@ export default function GalleryPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<ApprovedItem | null>(null);
   const [filter, setFilter] = useState<string>('all');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 12;
 
   const fetchApproved = useCallback(async () => {
     const res = await fetch('/api/pending');
@@ -187,6 +227,10 @@ export default function GalleryPage() {
   // Benzersiz stiller
   const styles = ['all', ...Array.from(new Set(items.map((i) => i.templateNameTr)))];
   const filtered = filter === 'all' ? items : items.filter((i) => i.templateNameTr === filter);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const changeFilter = (f: string) => { setFilter(f); setPage(1); };
 
   return (
     <div className="min-h-screen text-white">
@@ -212,7 +256,7 @@ export default function GalleryPage() {
             {styles.map((s) => (
               <button
                 key={s}
-                onClick={() => setFilter(s)}
+                onClick={() => changeFilter(s)}
                 className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
                   filter === s
                     ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
@@ -250,13 +294,56 @@ export default function GalleryPage() {
             )}
           </div>
         ) : (
-          <div className="columns-2 sm:columns-3 lg:columns-4 gap-4 space-y-4">
-            {filtered.map((item) => (
-              <div key={item.id} className="break-inside-avoid">
-                <ArtCard item={item} onClick={() => setSelected(item)} />
+          <>
+            <div className="columns-2 sm:columns-3 lg:columns-4 gap-4 space-y-4">
+              {paged.map((item) => (
+                <div key={item.id} className="break-inside-avoid">
+                  <ArtCard item={item} onClick={() => setSelected(item)} />
+                </div>
+              ))}
+            </div>
+
+            {/* Sayfalama */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-3 mt-12">
+                <button
+                  onClick={() => { setPage((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  disabled={page === 1}
+                  className="p-2.5 glass rounded-xl border border-white/10 text-white/50 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+
+                <div className="flex gap-1.5">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      className={`w-9 h-9 rounded-xl text-sm font-bold border transition-all ${
+                        p === page
+                          ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
+                          : 'glass border-white/10 text-white/40 hover:text-white hover:border-white/25'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => { setPage((p) => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  disabled={page === totalPages}
+                  className="p-2.5 glass rounded-xl border border-white/10 text-white/50 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+
+            <p className="text-center text-white/20 text-xs mt-4">
+              {filtered.length} eserin {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} arası gösteriliyor
+            </p>
+          </>
         )}
       </main>
 
