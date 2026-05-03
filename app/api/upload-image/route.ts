@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     const memItem = getById(id);
     if (memItem) {
       memItem.imageBase64 = base64;
-      updateStatus(id, 'pending');
+      memItem.status = 'pending';
     }
 
     return NextResponse.json({ ok: true, id });
