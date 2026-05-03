@@ -56,8 +56,8 @@ export default function KlavuzPage() {
           </h2>
           <div className="space-y-3">
             {[
-              { n: '1', title: 'Adın Soyadın (isteğe bağlı)', desc: 'Ziyaretçi adını yazarsa eser galeride ve büyük ekranda ismiyle görünür. Boş bırakılabilir.', color: 'cyan' },
-              { n: '2', title: '3 Kelime Gir', desc: 'Aklına gelen herhangi 3 kelimeyi yazar. Örn: "Ateş, Deniz, Rüzgâr". Yasak kelimeler filtresi otomatik çalışır.', color: 'purple' },
+              { n: '1', title: 'Ana Sayfa → /olustur', desc: 'Ziyaretçi ana sayfada projeyi tanır, "Hemen Başla" butonuna basar ve /olustur kiosk ekranına geçer.', color: 'cyan' },
+              { n: '2', title: 'Adın Soyadın + 3 Kelime', desc: 'İsteğe bağlı ad yazar, ardından 3 kelime girer. Örn: "Ateş, Deniz, Rüzgâr". Yasak kelimeler filtresi otomatik çalışır.', color: 'purple' },
               { n: '3', title: 'Sanat Stili Seç', desc: '10 sanat akımından biri seçilir: İzlenimcilik, Sürrealizm, Kübizm, Van Gogh, Pop Sanat, Art Deco, Barok, Siberpunk, Art Nouveau, Rönesans.', color: 'orange' },
               { n: '4', title: 'Görsel Üretimi', desc: 'Yapay zekâ (Nano Banana / Gemini 2.5) arka planda ~6–15 saniyede görseli üretir. Ziyaretçi bekleme ekranı görür.', color: 'cyan' },
               { n: '5', title: 'Sonuç Sayfası', desc: '"Görseliniz Hazırlanıyor" mesajı çıkar. Admin onaylayana kadar görsel gösterilmez. Ziyaretçi "Yenile & Kontrol Et" butonuna basarak kontrol eder.', color: 'green' },
@@ -195,7 +195,8 @@ export default function KlavuzPage() {
           </h2>
           <div className="glass border border-white/10 rounded-2xl overflow-hidden">
             {[
-              { path: '/', label: '3 Kelime 1 Şaheser', desc: 'Ana kiosk arayüzü — ziyaretçi kullanır', color: 'text-cyan-400' },
+              { path: '/', label: 'Ana Sayfa', desc: 'Proje tanıtımı ve bölüm linkleri', color: 'text-white/60' },
+              { path: '/olustur', label: '3 Kelime 1 Şaheser', desc: 'Kiosk arayüzü — ziyaretçi kullanır', color: 'text-cyan-400' },
               { path: '/demo', label: 'Prompt Atölyesi', desc: 'Serbest tema/stil/atmosfer seçimli üretim', color: 'text-purple-400' },
               { path: '/gallery', label: 'Galeri', desc: 'Tüm onaylı eserlerin ızgara görünümü', color: 'text-pink-400' },
               { path: '/display', label: 'Büyük Ekran', desc: 'Büyük monitöre yansıtmak için slideshow', color: 'text-green-400' },
