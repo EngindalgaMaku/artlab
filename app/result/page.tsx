@@ -45,7 +45,10 @@ function ResultContent() {
   const [checking, setChecking] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [pollCount, setPollCount] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const startTimeRef = useRef<number>(Date.now());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const id = params.get('id') ?? '';
   const style = params.get('style') ?? '';
@@ -59,6 +62,10 @@ function ResultContent() {
     if (pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
   }, []);
 
@@ -120,6 +127,12 @@ function ResultContent() {
       } catch {}
     }
 
+    // Start 1-second elapsed counter
+    startTimeRef.current = Date.now();
+    timerRef.current = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
+    }, 1000);
+
     // Immediate first check
     checkStatus(true);
 
@@ -170,10 +183,8 @@ function ResultContent() {
   const isGenerating = currentStatus === 'generating';
   const isPending = currentStatus === 'pending';
 
-  // Seconds since last poll for display
-  const secondsSincePoll = lastChecked
-    ? Math.floor((Date.now() - lastChecked.getTime()) / 1000)
-    : null;
+  const elapsedMM = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const elapsedSS = String(elapsed % 60).padStart(2, '0');
 
   return (
     <div className="min-h-screen text-white flex flex-col">
@@ -278,6 +289,17 @@ function ResultContent() {
                     ? 'Yapay zekâ görselinizi oluşturuyor. Bu 15–90 saniye sürebilir.'
                     : 'Görseliniz admin ekibine iletildi. Onaylandığında burada görünecek.'}
                 </p>
+              </div>
+
+              {/* Geçen süre — büyük sayaç */}
+              <div className="glass rounded-2xl px-6 py-4 border border-cyan-500/20 inline-flex items-center gap-3 mx-auto">
+                <Clock className="w-5 h-5 text-cyan-400/70 flex-shrink-0" />
+                <div className="text-left">
+                  <p className="font-mono text-3xl font-black text-cyan-300 leading-none tracking-widest">
+                    {elapsedMM}:{elapsedSS}
+                  </p>
+                  <p className="text-white/30 text-xs mt-0.5">geçen süre</p>
+                </div>
               </div>
 
               {/* Otomatik kontrol sayacı */}

@@ -382,9 +382,9 @@ export default function AdminPage() {
   const pending    = items.filter((i) => i.status === 'pending');
   const approved   = items.filter((i) => i.status === 'approved');
   const rejected   = items.filter((i) => i.status === 'rejected');
-  // Görsel bekleyen: pending AND no image yet (API üretmedi veya yüklenmediyse)
+  // Görsel bekleyen: pending veya error olup henüz görseli olmayan kalemler
   const waitingUpload = items.filter(
-    (i) => i.status === 'pending' && !i.imageBase64 && !i.imagePath,
+    (i) => (i.status === 'pending' || i.status === 'error' || i.status === 'generating') && !i.imageBase64 && !i.imagePath,
   );
 
   const StatusBadge = ({ status }: { status: PendingItem['status'] }) => {
