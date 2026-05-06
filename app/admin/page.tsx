@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   CheckCircle, XCircle, Clock, RefreshCw, Shield, Eye,
-  Lock, Monitor, Copy, Upload, ImagePlus, Check, AlertCircle, Trash2
+  Lock, Monitor, Copy, Upload, ImagePlus, Check, AlertCircle, Trash2, Loader2, Settings,
 } from 'lucide-react';
 
 interface PendingItem {
@@ -12,8 +12,10 @@ interface PendingItem {
   templateCategory: string;
   prompt: string;
   imageBase64: string;
+  imagePath?: string;
+  errorMessage?: string;
   createdAt: number;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'generating' | 'pending' | 'approved' | 'rejected' | 'error';
 }
 
 // ─── Giriş Ekranı ───
@@ -219,6 +221,107 @@ function UploadCard({ item, onUploaded }: { item: PendingItem; onUploaded: () =>
   );
 }
 
+// ─── Ayarlar Sekmesi ───
+interface ScaleModel { model: string; name: string; description: string; type: string; }
+interface AppSettings { backend: 'vertex' | 'scale'; scaleModel: string; }
+
+function SettingsTab() {
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [models, setModels] = useState<ScaleModel[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/admin-settings')
+      .then((r) => r.json())
+      .then((d) => { setSettings(d.settings); setModels(d.models ?? []); })
+      .catch(() => {});
+  }, []);
+
+  const save = async (patch: Partial<AppSettings>) => {
+    if (!settings) return;
+    setSaving(true);
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    const res = await fetch('/api/admin-settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    setSaving(false);
+    if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 2000); }
+  };
+
+  if (!settings) {
+    return (
+      <div className="glass rounded-2xl p-12 text-center border border-white/10">
+        <Loader2 className="w-8 h-8 animate-spin text-white/30 mx-auto" />
+      </div>
+    );
+  }
+
+  const imageModels = models.filter((m) => m.type === 'text-to-image');
+
+  return (
+    <div className="glass rounded-2xl border border-white/10 p-8 space-y-8 max-w-2xl">
+      <div>
+        <h2 className="text-lg font-semibold text-white mb-1">Görsel Üretim Motoru</h2>
+        <p className="text-white/40 text-sm mb-4">Hangi API ile görsel üretileceğini seçin.</p>
+        <div className="flex gap-3">
+          {(['vertex', 'scale'] as const).map((b) => (
+            <button
+              key={b}
+              onClick={() => save({ backend: b })}
+              className={`flex-1 py-3 rounded-2xl border text-sm font-semibold transition-all ${
+                settings.backend === b
+                  ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
+                  : 'glass border-white/10 text-white/40 hover:text-white hover:border-white/25'
+              }`}
+            >
+              {b === 'vertex' ? '⚡ Vertex (gemini-2.5-flash-image)' : '🌐 Scale (Nano Banana / Flux / …)'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {settings.backend === 'scale' && (
+        <div>
+          <h3 className="text-sm font-semibold text-white/70 mb-3">Scale Modeli</h3>
+          {imageModels.length === 0 ? (
+            <p className="text-white/30 text-sm">Model listesi yüklenemedi (API key kontrol edin).</p>
+          ) : (
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+              {imageModels.map((m) => (
+                <button
+                  key={m.model}
+                  onClick={() => save({ scaleModel: m.model })}
+                  className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
+                    settings.scaleModel === m.model
+                      ? 'bg-purple-500/20 border-purple-500/40 text-purple-200'
+                      : 'glass border-white/10 text-white/50 hover:text-white hover:border-white/25'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-sm">{m.name}</span>
+                    {settings.scaleModel === m.model && <Check className="w-4 h-4 text-purple-400" />}
+                  </div>
+                  <p className="text-xs mt-0.5 opacity-60 truncate">{m.description}</p>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center gap-3 pt-2 border-t border-white/10">
+        {saving && <Loader2 className="w-4 h-4 animate-spin text-white/40" />}
+        {saved && <span className="text-green-400 text-sm flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Kaydedildi</span>}
+        <p className="text-white/25 text-xs ml-auto">Seçim anında kaydedilir</p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Ana Admin Sayfası ───
 export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
@@ -226,7 +329,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<PendingItem | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [tab, setTab] = useState<'queue' | 'upload'>('upload');
+  const [tab, setTab] = useState<'queue' | 'upload' | 'settings'>('upload');
 
   const fetchQueue = useCallback(async () => {
     setLoading(true);
@@ -274,25 +377,44 @@ export default function AdminPage() {
     if (preview?.id === id) setPreview(null);
   };
 
-  const pending = items.filter((i) => i.status === 'pending');
-  const approved = items.filter((i) => i.status === 'approved');
-  const rejected = items.filter((i) => i.status === 'rejected');
-  // Görsel bekleyen (imageBase64 boş) pending öğeler
-  const waitingUpload = items.filter((i) => i.status === 'pending' && !i.imageBase64);
+  const generating = items.filter((i) => i.status === 'generating');
+  const errored    = items.filter((i) => i.status === 'error');
+  const pending    = items.filter((i) => i.status === 'pending');
+  const approved   = items.filter((i) => i.status === 'approved');
+  const rejected   = items.filter((i) => i.status === 'rejected');
+  // Görsel bekleyen: pending AND no image yet (API üretmedi veya yüklenmediyse)
+  const waitingUpload = items.filter(
+    (i) => i.status === 'pending' && !i.imageBase64 && !i.imagePath,
+  );
 
   const StatusBadge = ({ status }: { status: PendingItem['status'] }) => {
-    const map = {
-      pending: 'bg-yellow-500/15 border-yellow-500/30 text-yellow-400',
-      approved: 'bg-green-500/15 border-green-500/30 text-green-400',
-      rejected: 'bg-red-500/15 border-red-500/30 text-red-400',
+    const map: Record<PendingItem['status'], string> = {
+      generating: 'bg-blue-500/15 border-blue-500/30 text-blue-400',
+      pending:    'bg-yellow-500/15 border-yellow-500/30 text-yellow-400',
+      approved:   'bg-green-500/15 border-green-500/30 text-green-400',
+      rejected:   'bg-red-500/15 border-red-500/30 text-red-400',
+      error:      'bg-red-700/15 border-red-700/30 text-red-300',
     };
-    const labels = { pending: 'Bekliyor', approved: 'Onaylandı', rejected: 'Reddedildi' };
+    const labels: Record<PendingItem['status'], string> = {
+      generating: 'Üretiliyor',
+      pending:    'Bekliyor',
+      approved:   'Onaylandı',
+      rejected:   'Reddedildi',
+      error:      'Hata',
+    };
     return (
       <span className={`px-2 py-0.5 rounded-full text-xs border font-medium ${map[status]}`}>
         {labels[status]}
       </span>
     );
   };
+
+  /** Returns the best img src for an item */
+  function itemImgSrc(item: PendingItem): string {
+    if (item.imagePath) return item.imagePath;
+    if (item.imageBase64) return `data:image/png;base64,${item.imageBase64}`;
+    return '';
+  }
 
   return (
     <div className="min-h-screen text-white p-6">
@@ -328,10 +450,12 @@ export default function AdminPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-6 gap-4 mb-8">
           {[
+            { label: 'API Üretiyor', count: generating.length, color: 'text-blue-400', bg: 'border-blue-500/20' },
+            { label: 'API Hatası', count: errored.length, color: 'text-red-300', bg: 'border-red-700/20' },
             { label: 'Görsel Bekliyor', count: waitingUpload.length, color: 'text-orange-400', bg: 'border-orange-500/20' },
-            { label: 'Onay Bekliyor', count: pending.filter(i => !!i.imageBase64).length, color: 'text-yellow-400', bg: 'border-yellow-500/20' },
+            { label: 'Onay Bekliyor', count: pending.filter(i => !!(i.imageBase64 || i.imagePath)).length, color: 'text-yellow-400', bg: 'border-yellow-500/20' },
             { label: 'Onaylanan', count: approved.length, color: 'text-green-400', bg: 'border-green-500/20' },
             { label: 'Reddedilen', count: rejected.length, color: 'text-red-400', bg: 'border-red-500/20' },
           ].map((s) => (
@@ -343,7 +467,7 @@ export default function AdminPage() {
         </div>
 
         {/* Sekmeler */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-6 flex-wrap">
           <button
             onClick={() => setTab('upload')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
@@ -370,11 +494,22 @@ export default function AdminPage() {
           >
             <Eye className="w-4 h-4" />
             Onay Kuyruğu
-            {pending.filter(i => !!i.imageBase64).length > 0 && (
+            {pending.filter(i => !!(i.imageBase64 || i.imagePath)).length > 0 && (
               <span className="bg-cyan-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center">
-                {pending.filter(i => !!i.imageBase64).length}
+                {pending.filter(i => !!(i.imageBase64 || i.imagePath)).length}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setTab('settings')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all border ml-auto ${
+              tab === 'settings'
+                ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
+                : 'glass border-white/10 text-white/50 hover:text-white'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            API Ayarları
           </button>
         </div>
 
@@ -400,6 +535,9 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* ─── AYARLAR SEKMESİ ─── */}
+        {tab === 'settings' && <SettingsTab />}
+
         {/* ─── ONAY KUYRUĞU SEKMESİ ─── */}
         {tab === 'queue' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -407,15 +545,15 @@ export default function AdminPage() {
             <div>
               <h2 className="text-lg font-semibold text-white/70 mb-4 flex items-center gap-2">
                 <Clock className="w-5 h-5 text-yellow-400" />
-                Görseli Olan Gönderiler ({items.filter(i => !!i.imageBase64).length})
+                Görseli Olan Gönderiler ({items.filter(i => !!(i.imageBase64 || i.imagePath)).length})
               </h2>
               <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2">
-                {items.filter(i => !!i.imageBase64).length === 0 && (
+                {items.filter(i => !!(i.imageBase64 || i.imagePath)).length === 0 && (
                   <div className="glass rounded-2xl p-8 text-center text-white/30">
                     <p className="text-white/25 text-sm">Henüz görsel yüklenmiş gönderi yok</p>
                   </div>
                 )}
-                {items.filter(i => !!i.imageBase64).map((item) => (
+                {items.filter(i => !!(i.imageBase64 || i.imagePath)).map((item) => (
                   <div
                     key={item.id}
                     onClick={() => setPreview(item)}
@@ -424,12 +562,20 @@ export default function AdminPage() {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-white/5">
-                        <img
-                          src={`data:image/png;base64,${item.imageBase64}`}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
+                      <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-white/5 flex items-center justify-center">
+                        {itemImgSrc(item) ? (
+                          <img
+                            src={itemImgSrc(item)}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        ) : item.status === 'generating' ? (
+                          <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
+                        ) : item.status === 'error' ? (
+                          <AlertCircle className="w-6 h-6 text-red-400" />
+                        ) : (
+                          <ImagePlus className="w-6 h-6 text-white/20" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
@@ -486,11 +632,22 @@ export default function AdminPage() {
               </h2>
               {preview ? (
                 <div className="glass rounded-3xl overflow-hidden border border-white/10 neon-border">
-                  <img
-                    src={`data:image/png;base64,${preview.imageBase64}`}
-                    alt="Ön İzleme"
-                    className="w-full object-cover max-h-[50vh]"
-                  />
+                  {itemImgSrc(preview) ? (
+                    <img
+                      src={itemImgSrc(preview)}
+                      alt="Ön İzleme"
+                      className="w-full object-cover max-h-[50vh]"
+                    />
+                  ) : (
+                    <div className="w-full h-40 flex items-center justify-center bg-white/5">
+                      {preview.status === 'generating'
+                        ? <Loader2 className="w-10 h-10 text-blue-400 animate-spin" />
+                        : preview.status === 'error'
+                        ? <div className="text-center"><AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-2" /><p className="text-red-300/60 text-xs max-w-xs px-4">{preview.errorMessage}</p></div>
+                        : <ImagePlus className="w-10 h-10 text-white/20" />
+                      }
+                    </div>
+                  )}
                   <div className="p-5 space-y-3">
                     <div className="flex flex-wrap gap-2">
                       {preview.words.map((w, i) => (

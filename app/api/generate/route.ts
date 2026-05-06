@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStyleById, buildStyledPrompt } from '@/lib/artStyles';
 import { filterWords } from '@/lib/bannedWords';
-import { addPending, getById } from '@/lib/pendingStore';
-import { addPendingFile, updateImageBase64File } from '@/lib/fileStore';
+import { addPending, getById, updateStatus } from '@/lib/pendingStore';
+import { addPendingFile, updateImageBase64File, updateStatusFile } from '@/lib/fileStore';
+import { readSettings } from '@/lib/settings';
+import { generateImageWithScale } from '@/lib/scaleClient';
 import { randomUUID } from 'crypto';
 
 const VERTEX_API_KEY = process.env.VERTEX_API_KEY ?? '';
 
-async function generateImageInBackground(id: string, prompt: string) {
+// ── Vertex backend (synchronous, existing implementation) ──────────────────
+
+async function generateWithVertex(id: string, prompt: string) {
   try {
     const res = await fetch('https://vertex.claude.gg/v1/images/generations', {
       method: 'POST',
@@ -23,33 +27,62 @@ async function generateImageInBackground(id: string, prompt: string) {
         quality: 'hd',
         n: 1,
       }),
+      signal: AbortSignal.timeout(90_000),
     });
 
     if (!res.ok) {
       const err = await res.text();
-      console.error(`[Nano Banana] Hata ${res.status}:`, err);
+      const msg = `Vertex API hatası ${res.status}: ${err.slice(0, 200)}`;
+      console.error(`[Generate/Vertex] ${msg}`);
+      await updateStatusFile(id, 'error', msg).catch(() => {});
+      updateStatus(id, 'error', msg);
       return;
     }
 
     const data = await res.json() as { data?: { b64_json?: string }[] };
     const b64 = data?.data?.[0]?.b64_json;
     if (!b64) {
-      console.error('[Nano Banana] b64_json bulunamadı');
+      const msg = 'Vertex: yanıtta görsel verisi bulunamadı (b64_json)';
+      console.error(`[Generate/Vertex] ${msg}`);
+      await updateStatusFile(id, 'error', msg).catch(() => {});
+      updateStatus(id, 'error', msg);
       return;
     }
 
-    // Dosya ve bellek deposunu güncelle
     await updateImageBase64File(id, b64);
     const memItem = getById(id);
-    if (memItem) {
-      memItem.imageBase64 = b64;
-    }
-
-    console.log(`[Nano Banana] Görsel hazır → ${id}`);
-  } catch (err) {
-    console.error('[Nano Banana] İstek hatası:', err);
+    if (memItem) { memItem.imageBase64 = b64; memItem.status = 'pending'; }
+    console.log(`[Generate/Vertex] Görsel hazır → ${id}`);
+  } catch (err: any) {
+    const msg = err?.name === 'TimeoutError'
+      ? 'Vertex API zaman aşımı (90 sn)'
+      : `Vertex istek hatası: ${err?.message ?? String(err)}`;
+    console.error(`[Generate/Vertex] ${msg}`);
+    await updateStatusFile(id, 'error', msg).catch(() => {});
+    updateStatus(id, 'error', msg);
   }
 }
+
+// ── Scale backend (async task API) ────────────────────────────────────────
+
+async function generateWithScale(id: string, prompt: string, model: string) {
+  try {
+    console.log(`[Generate/Scale] Starting task — model=${model}, id=${id}`);
+    const { base64 } = await generateImageWithScale(VERTEX_API_KEY, model, prompt);
+
+    await updateImageBase64File(id, base64);
+    const memItem = getById(id);
+    if (memItem) { memItem.imageBase64 = base64; memItem.status = 'pending'; }
+    console.log(`[Generate/Scale] Görsel hazır → ${id}`);
+  } catch (err: any) {
+    const msg = err?.message ?? String(err);
+    console.error(`[Generate/Scale] ${msg}`);
+    await updateStatusFile(id, 'error', msg).catch(() => {});
+    updateStatus(id, 'error', msg);
+  }
+}
+
+// ── Route ─────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   try {
@@ -88,16 +121,27 @@ export async function POST(req: NextRequest) {
       prompt: finalPrompt,
       imageBase64: '',
       createdAt: Date.now(),
-      status: 'pending' as const,
+      status: 'generating' as const,
       creatorName: creatorName?.trim() || undefined,
     };
 
     addPending(item);
     await addPendingFile(item).catch((e) => console.warn('fileStore yazma hatası:', e));
 
-    // Nano Banana ile görsel üretimi arka planda başlat (~6 sn)
-    if (VERTEX_API_KEY) {
-      void generateImageInBackground(id, finalPrompt);
+    if (!VERTEX_API_KEY) {
+      const msg = 'API anahtarı sunucuda tanımlı değil (VERTEX_API_KEY)';
+      updateStatus(id, 'error', msg);
+      await updateStatusFile(id, 'error', msg).catch(() => {});
+      return NextResponse.json({ error: msg }, { status: 500 });
+    }
+
+    // Read backend selection from settings
+    const settings = await readSettings().catch(() => ({ backend: 'vertex' as const, scaleModel: 'nano-banana' }));
+
+    if (settings.backend === 'scale') {
+      void generateWithScale(id, finalPrompt, settings.scaleModel);
+    } else {
+      void generateWithVertex(id, finalPrompt);
     }
 
     return NextResponse.json({
@@ -108,6 +152,8 @@ export async function POST(req: NextRequest) {
       prompt: finalPrompt,
       imageBase64: null,
       imageReady: false,
+      status: 'generating',
+      backend: settings.backend,
     });
   } catch (err: any) {
     console.error('Route hatası:', err);

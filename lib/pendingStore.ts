@@ -7,8 +7,10 @@ export interface PendingItem {
   templateCategory: string;
   prompt: string;
   imageBase64: string;
+  imagePath?: string; // /generated/<id>.png (public/ relative)
   createdAt: number;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'generating' | 'pending' | 'approved' | 'rejected' | 'error';
+  errorMessage?: string;
   creatorName?: string;
 }
 
@@ -26,10 +28,15 @@ export function getPending(): PendingItem[] {
   return store.items;
 }
 
-export function updateStatus(id: string, status: 'approved' | 'rejected'): PendingItem | null {
+export function updateStatus(
+  id: string,
+  status: PendingItem['status'],
+  errorMessage?: string,
+): PendingItem | null {
   const item = store.items.find((i) => i.id === id);
   if (!item) return null;
   item.status = status;
+  if (errorMessage !== undefined) item.errorMessage = errorMessage;
   return item;
 }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPending, updateStatus, deleteItem } from '@/lib/pendingStore';
 import { getPendingFile, updateStatusFile, deleteItemFile } from '@/lib/fileStore';
+import type { PendingItem } from '@/lib/pendingStore';
 
 // GET /api/pending — kuyruğu getir (dosya öncelikli, fallback bellek)
 export async function GET() {
@@ -21,7 +22,7 @@ export async function PATCH(req: NextRequest) {
   if (!id || !action) {
     return NextResponse.json({ error: 'id ve action gerekli' }, { status: 400 });
   }
-  const status = action === 'approve' ? 'approved' : 'rejected';
+  const status: PendingItem['status'] = action === 'approve' ? 'approved' : 'rejected';
 
   const fileItem = await updateStatusFile(id, status).catch(() => null);
   const memItem = updateStatus(id, status);

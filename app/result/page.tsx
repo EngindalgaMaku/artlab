@@ -1,28 +1,51 @@
 'use client';
-import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Download, Sparkles, RefreshCw, Clock, CheckCircle } from 'lucide-react';
+import {
+  ArrowLeft, Download, Sparkles, RefreshCw, Clock, CheckCircle, AlertTriangle,
+} from 'lucide-react';
 import QRCode from 'qrcode';
 import { addWatermark } from '@/lib/addWatermark';
 
-interface ResultData {
+interface StatusData {
   id: string;
-  imageBase64: string | null;
+  status: 'generating' | 'pending' | 'approved' | 'rejected' | 'error';
+  errorMessage: string | null;
   imageReady: boolean;
+  imagePath: string | null;
+}
+
+interface FullData extends StatusData {
+  words?: [string, string, string];
   templateNameTr: string;
   templateCategory: string;
   prompt: string;
-  status?: string;
+  imageBase64: string | null;
+  imageUrl: string | null;
 }
+
+const STATUS_LABELS: Record<StatusData['status'], string> = {
+  generating: 'Görsel üretiliyor…',
+  pending:    'Admin onayı bekleniyor…',
+  approved:   'Görsel Hazır',
+  rejected:   'Reddedildi',
+  error:      'Üretim Hatası',
+};
+
+const POLL_INTERVAL_MS = 7_000;
 
 function ResultContent() {
   const params = useSearchParams();
   const router = useRouter();
-  const [data, setData] = useState<ResultData | null>(null);
-  const [qrUrl, setQrUrl] = useState('');
+
+  const [status, setStatus] = useState<StatusData | null>(null);
+  const [fullData, setFullData] = useState<FullData | null>(null);
   const [imgSrc, setImgSrc] = useState('');
+  const [qrUrl, setQrUrl] = useState('');
   const [checking, setChecking] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const [pollCount, setPollCount] = useState(0);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const id = params.get('id') ?? '';
   const style = params.get('style') ?? '';
@@ -32,50 +55,87 @@ function ResultContent() {
   const w3 = params.get('w3') ?? '';
   const creatorName = params.get('name') ?? '';
 
-  // Sunucudan güncel durumu çek
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  /** Lightweight status check — only fetches meta, not the full image */
   const checkStatus = useCallback(async (silent = false) => {
     if (!id) return;
     if (!silent) setChecking(true);
     try {
-      const res = await fetch(`/api/submission/${id}`);
-      if (res.ok) {
-        const fresh = await res.json() as ResultData;
-        setData(fresh);
-        if (fresh.imageReady && fresh.imageBase64) {
-          const watermarked = await addWatermark(
-            fresh.imageBase64,
-            creatorName,
-            'AI ArtLab'
-          );
-          setImgSrc(watermarked);
+      const res = await fetch(`/api/status/${id}`);
+      if (!res.ok) return;
+      const s: StatusData = await res.json();
+      setStatus(s);
+      setLastChecked(new Date());
+      setPollCount((c) => c + 1);
+
+      // Terminal states — fetch full data then stop polling
+      if (s.status === 'approved' && s.imageReady) {
+        stopPolling();
+        // Fetch full submission to get base64 / imageUrl
+        const fullRes = await fetch(`/api/submission/${id}`);
+        if (fullRes.ok) {
+          const fd: FullData = await fullRes.json();
+          setFullData(fd);
+
+          // Prefer disk URL; fall back to inline base64
+          let rawSrc: string | null = null;
+          if (fd.imageUrl) {
+            rawSrc = fd.imageUrl; // e.g. /generated/<id>.png
+          } else if (fd.imageBase64) {
+            rawSrc = `data:image/png;base64,${fd.imageBase64}`;
+          }
+          if (rawSrc) {
+            const watermarked = await addWatermark(
+              rawSrc,
+              creatorName,
+              'AI ArtLab',
+            );
+            setImgSrc(watermarked);
+          }
         }
-        setLastChecked(new Date());
+      } else if (s.status === 'error' || s.status === 'rejected') {
+        stopPolling();
       }
     } finally {
       if (!silent) setChecking(false);
     }
-  }, [id]);
+  }, [id, creatorName, stopPolling]);
 
-  // İlk yükleme: önce session storage, sonra sunucu
+  // Bootstrap
   useEffect(() => {
     if (!id) return;
-    // Önce session storage'dan prompt/stil bilgilerini al (görsel hariç)
+
+    // Load meta from session storage first
     const raw = sessionStorage.getItem(`result_${id}`);
     if (raw) {
       try {
-        const parsed: ResultData = JSON.parse(raw);
-        setData({ ...parsed, imageBase64: null, imageReady: false });
+        const parsed = JSON.parse(raw) as FullData;
+        setFullData({ ...parsed, imageBase64: null, imageReady: false });
       } catch {}
     }
-    // Sunucudan taze veri çek (görsel dahil — watermark ile)
+
+    // Immediate first check
     checkStatus(true);
 
+    // Start polling
+    pollRef.current = setInterval(() => checkStatus(true), POLL_INTERVAL_MS);
+
+    // QR code
     const qrText = `AI ArtLab – TÜBİTAK 4006\nKelimeler: ${w1} · ${w2} · ${w3}\nStil: ${style}`;
     QRCode.toDataURL(qrText, {
       width: 200,
       margin: 2,
       color: { dark: '#00f0ff', light: '#0a0a2e' },
     }).then(setQrUrl);
+
+    return () => stopPolling();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const handleDownload = () => {
@@ -87,11 +147,12 @@ function ResultContent() {
   };
 
   const handleNewArt = () => {
+    stopPolling();
     sessionStorage.removeItem(`result_${id}`);
     router.push('/olustur');
   };
 
-  if (!data) {
+  if (!status && !fullData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -102,13 +163,26 @@ function ResultContent() {
     );
   }
 
-  const imageReady = data.imageReady && !!imgSrc;
+  const currentStatus = status?.status ?? 'generating';
+  const imageReady = currentStatus === 'approved' && !!imgSrc;
+  const isError = currentStatus === 'error';
+  const isRejected = currentStatus === 'rejected';
+  const isGenerating = currentStatus === 'generating';
+  const isPending = currentStatus === 'pending';
+
+  // Seconds since last poll for display
+  const secondsSincePoll = lastChecked
+    ? Math.floor((Date.now() - lastChecked.getTime()) / 1000)
+    : null;
 
   return (
     <div className="min-h-screen text-white flex flex-col">
       {/* Top bar */}
       <div className="glass border-b border-white/10 px-6 py-3 flex items-center justify-between">
-        <button onClick={handleNewArt} className="flex items-center gap-2 text-white/60 hover:text-white transition-colors text-sm">
+        <button
+          onClick={handleNewArt}
+          className="flex items-center gap-2 text-white/60 hover:text-white transition-colors text-sm"
+        >
           <ArrowLeft className="w-4 h-4" /> Yeni Şaheser
         </button>
         <span className="text-cyan-400 font-semibold text-sm">AI ArtLab</span>
@@ -130,8 +204,54 @@ function ResultContent() {
               alt="AI Üretilen Sanat Eseri"
               className="max-h-[80vh] max-w-full rounded-3xl result-glow object-contain"
             />
+          ) : isError ? (
+            /* Hata durumu */
+            <div className="text-center max-w-sm space-y-6">
+              <div className="relative w-36 h-36 mx-auto">
+                <div className="absolute inset-0 rounded-full border-4 border-red-500/20" />
+                <div className="absolute inset-5 rounded-full bg-red-500/10 flex items-center justify-center">
+                  <AlertTriangle className="w-10 h-10 text-red-400/80" />
+                </div>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-red-400 mb-2">Görsel Üretilemedi</h2>
+                <p className="text-white/40 text-sm leading-relaxed">
+                  {status?.errorMessage ?? 'API bir hata döndürdü veya zaman aşımı oluştu.'}
+                </p>
+              </div>
+              <button
+                onClick={handleNewArt}
+                className="flex items-center gap-2 mx-auto px-6 py-3 btn-neon rounded-2xl font-semibold text-sm"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Yeniden Dene
+              </button>
+            </div>
+          ) : isRejected ? (
+            /* Reddedildi */
+            <div className="text-center max-w-sm space-y-6">
+              <div className="relative w-36 h-36 mx-auto">
+                <div className="absolute inset-0 rounded-full border-4 border-orange-500/20" />
+                <div className="absolute inset-5 rounded-full bg-orange-500/10 flex items-center justify-center">
+                  <AlertTriangle className="w-10 h-10 text-orange-400/80" />
+                </div>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-orange-400 mb-2">İçerik Onaylanmadı</h2>
+                <p className="text-white/40 text-sm leading-relaxed">
+                  Görseliniz yönetici tarafından uygun bulunmadı.
+                </p>
+              </div>
+              <button
+                onClick={handleNewArt}
+                className="flex items-center gap-2 mx-auto px-6 py-3 btn-neon rounded-2xl font-semibold text-sm"
+              >
+                <Sparkles className="w-4 h-4" />
+                Yeni Şaheser Yarat
+              </button>
+            </div>
           ) : (
-            /* Görsel henüz hazır değil */
+            /* Üretiliyor / Onay bekleniyor */
             <div className="text-center max-w-sm space-y-6">
               {/* Animasyonlu halka */}
               <div className="relative w-36 h-36 mx-auto">
@@ -150,33 +270,46 @@ function ResultContent() {
               </div>
 
               <div>
-                <h2 className="text-2xl font-bold text-white mb-2">Görseliniz Hazırlanıyor</h2>
+                <h2 className="text-2xl font-bold text-white mb-2">
+                  {isGenerating ? 'Görsel Üretiliyor' : 'Görsel Onay Bekliyor'}
+                </h2>
                 <p className="text-white/40 text-sm leading-relaxed">
-                  Promptunuz admin ekibine iletildi.
-                  <br />
-                  Görsel yüklendikten sonra burada görünecek.
+                  {isGenerating
+                    ? 'Yapay zekâ görselinizi oluşturuyor. Bu 15–90 saniye sürebilir.'
+                    : 'Görseliniz admin ekibine iletildi. Onaylandığında burada görünecek.'}
                 </p>
               </div>
 
-              {/* Son kontrol zamanı */}
-              {lastChecked && (
-                <p className="text-white/20 text-xs">
-                  Son kontrol: {lastChecked.toLocaleTimeString('tr-TR')}
-                </p>
-              )}
+              {/* Otomatik kontrol sayacı */}
+              <div className="space-y-2">
+                <div className="h-1 bg-white/10 rounded-full overflow-hidden w-48 mx-auto">
+                  <div
+                    className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 rounded-full"
+                    style={{
+                      width: '100%',
+                      animation: `shrink ${POLL_INTERVAL_MS / 1000}s linear infinite`,
+                    }}
+                  />
+                </div>
+                {lastChecked && (
+                  <p className="text-white/20 text-xs">
+                    Son kontrol: {lastChecked.toLocaleTimeString('tr-TR')} · #{pollCount}. sorgu
+                  </p>
+                )}
+              </div>
 
-              {/* Yenile butonu */}
+              {/* Manuel yenile butonu */}
               <button
                 onClick={() => checkStatus(false)}
                 disabled={checking}
                 className="flex items-center gap-2 mx-auto px-6 py-3 btn-neon rounded-2xl font-semibold text-sm disabled:opacity-50"
               >
                 <RefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
-                {checking ? 'Kontrol ediliyor…' : 'Yenile & Kontrol Et'}
+                {checking ? 'Kontrol ediliyor…' : 'Şimdi Kontrol Et'}
               </button>
 
               <p className="text-white/20 text-xs">
-                Görsel hazır olduğunda yenile butonuna bas
+                Her {POLL_INTERVAL_MS / 1000} saniyede bir otomatik güncelleniyor
               </p>
             </div>
           )}
@@ -189,11 +322,23 @@ function ResultContent() {
           <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium w-fit ${
             imageReady
               ? 'bg-green-500/10 border-green-500/25 text-green-400'
+              : isError
+              ? 'bg-red-500/10 border-red-500/25 text-red-400'
+              : isRejected
+              ? 'bg-orange-500/10 border-orange-500/25 text-orange-400'
+              : isPending
+              ? 'bg-blue-500/10 border-blue-500/25 text-blue-300'
               : 'bg-yellow-500/10 border-yellow-500/25 text-yellow-400'
           }`}>
             {imageReady
               ? <><CheckCircle className="w-3.5 h-3.5" /> Görsel Hazır</>
-              : <><Clock className="w-3.5 h-3.5" /> Hazırlanıyor…</>
+              : isError
+              ? <><AlertTriangle className="w-3.5 h-3.5" /> Hata</>
+              : isRejected
+              ? <><AlertTriangle className="w-3.5 h-3.5" /> Reddedildi</>
+              : isPending
+              ? <><Clock className="w-3.5 h-3.5" /> Admin Onayı Bekleniyor</>
+              : <><Clock className="w-3.5 h-3.5" /> Üretiliyor…</>
             }
           </div>
 
@@ -214,8 +359,8 @@ function ResultContent() {
           {/* Seçilen stil */}
           <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
             <p className="text-xs text-white/40 mb-1">Seçilen Stil</p>
-            <p className="text-lg font-bold text-white">{style || data.templateNameTr}</p>
-            <p className="text-xs text-white/40 mt-0.5">{category || data.templateCategory}</p>
+            <p className="text-lg font-bold text-white">{style || fullData?.templateNameTr}</p>
+            <p className="text-xs text-white/40 mt-0.5">{category || fullData?.templateCategory}</p>
           </div>
 
           {/* Oluşturan */}
@@ -227,14 +372,16 @@ function ResultContent() {
           </div>
 
           {/* Prompt */}
-          <div className="bg-black/40 rounded-2xl p-4 border border-cyan-500/20">
-            <p className="text-xs text-white/30 mb-2 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-cyan-400" /> Kullanılan AI Prompt
-            </p>
-            <p className="font-mono text-xs text-cyan-300/80 leading-relaxed">
-              {data.prompt}
-            </p>
-          </div>
+          {fullData?.prompt && (
+            <div className="bg-black/40 rounded-2xl p-4 border border-cyan-500/20">
+              <p className="text-xs text-white/30 mb-2 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-cyan-400" /> Kullanılan AI Prompt
+              </p>
+              <p className="font-mono text-xs text-cyan-300/80 leading-relaxed">
+                {fullData.prompt}
+              </p>
+            </div>
+          )}
 
           {/* QR Kod — sadece görsel hazır olunca göster */}
           {imageReady && qrUrl && (
@@ -254,6 +401,14 @@ function ResultContent() {
           </button>
         </div>
       </div>
+
+      {/* Inline keyframe for progress bar shrink animation */}
+      <style>{`
+        @keyframes shrink {
+          from { transform: scaleX(1); transform-origin: left; }
+          to   { transform: scaleX(0); transform-origin: left; }
+        }
+      `}</style>
     </div>
   );
 }

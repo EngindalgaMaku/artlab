@@ -1,17 +1,31 @@
 /**
- * Base64 görselin sağ alt köşesine isim etiketi ekler.
- * Canvas API ile client-side çalışır, orijinal görsel değişmez.
+ * Görselin sağ alt köşesine isim etiketi ekler.
+ * Canvas API ile client-side çalışır.
+ *
+ * `src` parametresi şunlardan biri olabilir:
+ *  - raw base64 string (prefix'siz)
+ *  - "data:image/...;base64,…" data URL
+ *  - "/generated/<id>.png" gibi bir URL
  */
 export async function addWatermark(
-  base64: string,
+  src: string,
   name: string,
-  label = 'AI ArtLab'
+  label = 'AI ArtLab',
 ): Promise<string> {
+  // Kaynağa uygun img.src değerini belirle
+  let imgSrc: string;
+  if (src.startsWith('data:') || src.startsWith('/') || src.startsWith('http')) {
+    imgSrc = src; // already a URL or data-URL
+  } else {
+    imgSrc = `data:image/png;base64,${src}`; // raw base64
+  }
+
   // İsim yoksa görseli olduğu gibi döndür
-  if (!name?.trim()) return `data:image/png;base64,${base64}`;
+  if (!name?.trim()) return imgSrc;
 
   return new Promise((resolve) => {
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = () => {
       const canvas = document.createElement('canvas');
       canvas.width = img.width;
@@ -59,6 +73,7 @@ export async function addWatermark(
 
       resolve(canvas.toDataURL('image/png'));
     };
-    img.src = `data:image/png;base64,${base64}`;
+    img.onerror = () => resolve(imgSrc); // watermark başarısız olursa orijinali dön
+    img.src = imgSrc;
   });
 }
