@@ -7,7 +7,8 @@ export interface PendingItem {
   templateCategory: string;
   prompt: string;
   imageBase64: string;
-  imagePath?: string; // /generated/<id>.png (public/ relative)
+  imagePath?: string;    // /generated/<id>.png (local filesystem)
+  imageBlobUrl?: string; // Vercel Blob public URL
   createdAt: number;
   status: 'generating' | 'pending' | 'approved' | 'rejected' | 'error';
   errorMessage?: string;

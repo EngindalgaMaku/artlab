@@ -13,6 +13,7 @@ interface PendingItem {
   prompt: string;
   imageBase64: string;
   imagePath?: string;
+  imageBlobUrl?: string;
   errorMessage?: string;
   createdAt: number;
   status: 'generating' | 'pending' | 'approved' | 'rejected' | 'error';
@@ -499,7 +500,7 @@ export default function AdminPage() {
   const rejected   = items.filter((i) => i.status === 'rejected');
   // Görsel bekleyen: pending veya error olup henüz görseli olmayan kalemler
   const waitingUpload = items.filter(
-    (i) => (i.status === 'pending' || i.status === 'error' || i.status === 'generating') && !i.imageBase64 && !i.imagePath,
+    (i) => (i.status === 'pending' || i.status === 'error' || i.status === 'generating') && !i.imageBlobUrl && !i.imagePath && !i.imageBase64,
   );
 
   const StatusBadge = ({ status }: { status: PendingItem['status'] }) => {
@@ -524,11 +525,16 @@ export default function AdminPage() {
     );
   };
 
-  /** Returns the best img src for an item */
+  /** Blob URL > disk path > base64 data URI öncelik sırası */
   function itemImgSrc(item: PendingItem): string {
+    if (item.imageBlobUrl) return item.imageBlobUrl;
     if (item.imagePath) return item.imagePath;
     if (item.imageBase64) return `data:image/png;base64,${item.imageBase64}`;
     return '';
+  }
+
+  function hasImage(item: PendingItem): boolean {
+    return !!(item.imageBlobUrl || item.imagePath || item.imageBase64);
   }
 
   return (
@@ -570,7 +576,7 @@ export default function AdminPage() {
             { label: 'API Üretiyor', count: generating.length, color: 'text-blue-400', bg: 'border-blue-500/20' },
             { label: 'API Hatası', count: errored.length, color: 'text-red-300', bg: 'border-red-700/20' },
             { label: 'Görsel Bekliyor', count: waitingUpload.length, color: 'text-orange-400', bg: 'border-orange-500/20' },
-            { label: 'Onay Bekliyor', count: pending.filter(i => !!(i.imageBase64 || i.imagePath)).length, color: 'text-yellow-400', bg: 'border-yellow-500/20' },
+            { label: 'Onay Bekliyor', count: pending.filter(i => hasImage(i)).length, color: 'text-yellow-400', bg: 'border-yellow-500/20' },
             { label: 'Onaylanan', count: approved.length, color: 'text-green-400', bg: 'border-green-500/20' },
             { label: 'Reddedilen', count: rejected.length, color: 'text-red-400', bg: 'border-red-500/20' },
           ].map((s) => (
@@ -609,9 +615,9 @@ export default function AdminPage() {
           >
             <Eye className="w-4 h-4" />
             Onay Kuyruğu
-            {pending.filter(i => !!(i.imageBase64 || i.imagePath)).length > 0 && (
+            {pending.filter(i => hasImage(i)).length > 0 && (
               <span className="bg-cyan-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center">
-                {pending.filter(i => !!(i.imageBase64 || i.imagePath)).length}
+                {pending.filter(i => hasImage(i)).length}
               </span>
             )}
           </button>
@@ -660,15 +666,15 @@ export default function AdminPage() {
             <div>
               <h2 className="text-lg font-semibold text-white/70 mb-4 flex items-center gap-2">
                 <Clock className="w-5 h-5 text-yellow-400" />
-                Görseli Olan Gönderiler ({items.filter(i => !!(i.imageBase64 || i.imagePath)).length})
+                Görseli Olan Gönderiler ({items.filter(i => hasImage(i)).length})
               </h2>
               <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2">
-                {items.filter(i => !!(i.imageBase64 || i.imagePath)).length === 0 && (
+                {items.filter(i => hasImage(i)).length === 0 && (
                   <div className="glass rounded-2xl p-8 text-center text-white/30">
                     <p className="text-white/25 text-sm">Henüz görsel yüklenmiş gönderi yok</p>
                   </div>
                 )}
-                {items.filter(i => !!(i.imageBase64 || i.imagePath)).map((item) => (
+                {items.filter(i => hasImage(i)).map((item) => (
                   <div
                     key={item.id}
                     onClick={() => setPreview(item)}

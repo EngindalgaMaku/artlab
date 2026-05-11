@@ -15,6 +15,7 @@ export async function GET(
   }
 
   const approved = item.status === 'approved';
+  const hasImage = !!(item.imageBase64 || item.imagePath || item.imageBlobUrl);
 
   return NextResponse.json({
     id: item.id,
@@ -24,10 +25,15 @@ export async function GET(
     prompt: item.prompt,
     status: item.status,
     errorMessage: item.errorMessage ?? null,
-    imageReady: approved && !!(item.imageBase64 || item.imagePath),
-    // Serve path URL when image is saved to disk; fallback to inline base64
-    imageUrl: approved && item.imagePath ? item.imagePath : null,
-    imageBase64: approved ? (item.imageBase64 || null) : null,
+    imageReady: approved && hasImage,
+    // Prefer Blob URL → local path URL → inline base64
+    imageUrl: approved
+      ? (item.imageBlobUrl ?? (item.imagePath ?? null))
+      : null,
+    imageBase64: approved && !item.imageBlobUrl && !item.imagePath
+      ? (item.imageBase64 || null)
+      : null,
     createdAt: item.createdAt,
+    creatorName: item.creatorName ?? null,
   });
 }

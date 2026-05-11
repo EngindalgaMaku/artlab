@@ -9,13 +9,15 @@ interface ApprovedItem {
   templateCategory: string;
   prompt: string;
   imageBase64: string;
-  imagePath?: string;   // /generated/<id>.png — disk URL (tercih edilir)
+  imagePath?: string;      // /generated/<id>.png — yerel disk
+  imageBlobUrl?: string;   // Vercel Blob kalıcı URL
   createdAt: number;
   creatorName?: string;
 }
 
-/** Disk URL varsa onu kullan (tarayıcı önbelleğe alır), yoksa base64 data URI */
+/** Blob URL > disk path > base64 data URI öncelik sırası */
 function resolveImgSrc(item: ApprovedItem): string {
+  if (item.imageBlobUrl) return item.imageBlobUrl;
   if (item.imagePath) return item.imagePath;
   if (item.imageBase64) return `data:image/png;base64,${item.imageBase64}`;
   return '';
