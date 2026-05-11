@@ -82,8 +82,10 @@ export default function InteractiveDemo() {
       const res = await fetch(`/api/submission/${id}`);
       if (!res.ok) return;
       const data = await res.json();
-      if (data.imageReady && data.imageBase64) {
-        const watermarked = await addWatermark(data.imageBase64, creatorName, 'AI ArtLab');
+      // imageUrl = disk yolu (/generated/xxx.png), imageBase64 = ham base64 fallback
+      const rawSrc: string | null = data.imageUrl ?? (data.imageBase64 ? data.imageBase64 : null);
+      if (data.imageReady && rawSrc) {
+        const watermarked = await addWatermark(rawSrc, creatorName, 'AI ArtLab');
         setImageSrc(watermarked);
         setPhase('done');
         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
@@ -92,7 +94,7 @@ export default function InteractiveDemo() {
     } catch { /* sessizce devam et */ } finally {
       setChecking(false);
     }
-  }, []);
+  }, [creatorName]);
 
   const generate = async () => {
     setPhase('generating');

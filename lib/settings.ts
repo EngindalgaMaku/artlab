@@ -15,7 +15,7 @@ export interface AppSettings {
 const SETTINGS_FILE = path.join(process.cwd(), 'data', 'settings.json');
 
 const DEFAULTS: AppSettings = {
-  backend: 'vertex',
+  backend: 'scale',        // Varsayılan: Scale (nano-banana) — ~11 sn, en hızlı
   scaleModel: 'nano-banana',
 };
 

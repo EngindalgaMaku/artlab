@@ -9,8 +9,16 @@ interface ApprovedItem {
   templateCategory: string;
   prompt: string;
   imageBase64: string;
+  imagePath?: string;   // /generated/<id>.png — disk URL (tercih edilir)
   createdAt: number;
   creatorName?: string;
+}
+
+/** Disk URL varsa onu kullan (tarayıcı önbelleğe alır), yoksa base64 data URI */
+function resolveImgSrc(item: ApprovedItem): string {
+  if (item.imagePath) return item.imagePath;
+  if (item.imageBase64) return `data:image/png;base64,${item.imageBase64}`;
+  return '';
 }
 
 export default function DisplayPage() {
@@ -23,7 +31,9 @@ export default function DisplayPage() {
   const fetchApproved = useCallback(async () => {
     const res = await fetch('/api/pending');
     const data = await res.json();
-    const approved = (data.items ?? []).filter((i: ApprovedItem & { status: string }) => i.status === 'approved');
+    const approved = (data.items ?? []).filter(
+      (i: ApprovedItem & { status: string }) => i.status === 'approved',
+    );
     setItems(approved);
   }, []);
 
@@ -93,7 +103,7 @@ export default function DisplayPage() {
   };
 
   const item = items[current] ?? null;
-  const imgSrc = item?.imageBase64 ? `data:image/png;base64,${item.imageBase64}` : '';
+  const imgSrc = item ? resolveImgSrc(item) : '';
 
   return (
     <div className="min-h-screen text-white relative overflow-hidden flex flex-col items-center justify-center">

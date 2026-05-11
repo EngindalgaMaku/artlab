@@ -11,11 +11,20 @@ interface ApprovedItem {
   templateCategory: string;
   prompt: string;
   imageBase64: string;
+  imagePath?: string;   // /generated/<id>.png — disk URL (tercih edilir)
   createdAt: number;
   creatorName?: string;
 }
 
+/** Disk URL varsa onu kullan (tarayıcı önbelleğe alır), yoksa base64 data URI */
+function resolveImgSrc(item: ApprovedItem): string {
+  if (item.imagePath) return item.imagePath;
+  if (item.imageBase64) return `data:image/png;base64,${item.imageBase64}`;
+  return '';
+}
+
 function ArtCard({ item, onClick }: { item: ApprovedItem; onClick: () => void }) {
+  const src = resolveImgSrc(item);
   return (
     <div
       onClick={onClick}
@@ -24,7 +33,7 @@ function ArtCard({ item, onClick }: { item: ApprovedItem; onClick: () => void })
       {/* Görsel */}
       <div className="relative overflow-hidden aspect-[3/4] bg-white/5">
         <img
-          src={`data:image/png;base64,${item.imageBase64}`}
+          src={src}
           alt={item.words.join(', ')}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
@@ -74,6 +83,7 @@ function ArtCard({ item, onClick }: { item: ApprovedItem; onClick: () => void })
 
 function Modal({ item, onClose }: { item: ApprovedItem; onClose: () => void }) {
   const [zoomed, setZoomed] = useState(false);
+  const imgSrc = resolveImgSrc(item);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -82,8 +92,6 @@ function Modal({ item, onClose }: { item: ApprovedItem; onClose: () => void }) {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onClose, zoomed]);
-
-  const imgSrc = `data:image/png;base64,${item.imageBase64}`;
 
   // Tam ekran zoom katmanı
   if (zoomed) {
@@ -212,7 +220,8 @@ export default function GalleryPage() {
     const res = await fetch('/api/pending');
     const data = await res.json();
     const approved = (data.items ?? []).filter(
-      (i: ApprovedItem & { status: string }) => i.status === 'approved' && i.imageBase64
+      (i: ApprovedItem & { status: string }) =>
+        i.status === 'approved' && (i.imageBase64 || i.imagePath),
     );
     setItems(approved);
     setLoading(false);

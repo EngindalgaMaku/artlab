@@ -75,9 +75,10 @@ export default function LandingPage() {
   useEffect(() => {
     fetch('/api/pending')
       .then((r) => r.json())
-      .then((d) => {
+        .then((d) => {
         const count = (d.items ?? []).filter(
-          (i: { status: string; imageBase64: string }) => i.status === 'approved' && i.imageBase64
+          (i: { status: string; imageBase64: string; imagePath?: string }) =>
+            i.status === 'approved' && (i.imageBase64 || i.imagePath),
         ).length;
         setApprovedCount(count);
       })

@@ -11,6 +11,33 @@ const SCALE_BASE = 'https://scale.claude.gg';
 const POLL_MS = 3_000;          // poll every 3 seconds
 const MAX_WAIT_MS = 180_000;    // give up after 3 minutes
 
+/**
+ * Her Scale modeli farklı geçerli boyut listesine sahip.
+ * Portresiz (portrait) en yakın boyutu modele göre seç.
+ * Bilinmeyen modeller için 848x1264 kullan.
+ */
+const MODEL_PORTRAIT_SIZE: Record<string, string> = {
+  'nano-banana':              '832x1248',   // Gemini 2.5 — sadece bu boyutu kabul ediyor
+  'nano-banana-pro':          '848x1264',   // Gemini 3.0
+  'nano-banana-pro-flash':    '848x1264',   // Gemini 3.1
+  'flux-2':                   '848x1264',
+  'flux-2-flex':              '848x1264',
+  'flux-2-pro':               '848x1264',
+  'flux-kontext-max':         '848x1264',
+  'seedream-seedream-v4':     '848x1264',
+  'seedream-seedream-v5-lite':'848x1264',
+  'imagen-4':                 '896x1200',
+  'imagen-4-fast':            '896x1200',
+  'imagen-4-ultra':           '896x1200',
+  'ideogram-3':               '848x1264',
+  'gpt-image-2':              '1024x1024',
+  'gpt-image-1-5':            '1024x1024',
+};
+
+function getPortraitSize(model: string): string {
+  return MODEL_PORTRAIT_SIZE[model] ?? '848x1264';
+}
+
 interface SubmitResponse {
   task_id: string;
   status: string;
@@ -33,8 +60,10 @@ export async function generateImageWithScale(
   apiKey: string,
   model: string,
   prompt: string,
-  size = '832x1248',   // portrait 2:3 close to original 1024x1792
+  /** Boyut belirtilmezse modele göre otomatik seçilir */
+  size?: string,
 ): Promise<ScaleResult> {
+  const resolvedSize = size ?? getPortraitSize(model);
   const headers = {
     'Authorization': `Bearer ${apiKey}`,
     'Content-Type': 'application/json',
@@ -48,7 +77,7 @@ export async function generateImageWithScale(
       model,
       params: {
         prompt,
-        size,
+        size: resolvedSize,
         n: 1,
       },
     }),

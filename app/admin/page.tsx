@@ -225,6 +225,25 @@ function UploadCard({ item, onUploaded }: { item: PendingItem; onUploaded: () =>
 interface ScaleModel { model: string; name: string; description: string; type: string; }
 interface AppSettings { backend: 'vertex' | 'scale'; scaleModel: string; }
 
+/** Gerçek test ölçümleri + tahminler */
+const MODEL_SPEED_INFO: Record<string, { speed: string; quality: string; recommended?: boolean; badge: string }> = {
+  'nano-banana':               { speed: '~11 sn', quality: 'İyi',      recommended: true, badge: 'bg-green-500/20 border-green-500/40 text-green-300' },
+  'nano-banana-pro-flash':     { speed: '~25 sn', quality: 'Yüksek',                      badge: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300' },
+  'nano-banana-pro':           { speed: '~51 sn', quality: 'Yüksek',                      badge: 'bg-yellow-500/15 border-yellow-500/30 text-yellow-300' },
+  'seedream-seedream-v5-lite': { speed: '~15 sn', quality: 'İyi',                         badge: 'bg-green-500/15 border-green-500/30 text-green-300' },
+  'seedream-seedream-v4':      { speed: '~25 sn', quality: 'İyi',                         badge: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300' },
+  'flux-2-flex':               { speed: '~15 sn', quality: 'İyi',                         badge: 'bg-green-500/15 border-green-500/30 text-green-300' },
+  'flux-2':                    { speed: '~20 sn', quality: 'İyi',                         badge: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300' },
+  'flux-2-pro':                { speed: '~40 sn', quality: 'Yüksek',                      badge: 'bg-yellow-500/15 border-yellow-500/30 text-yellow-300' },
+  'flux-kontext-max':          { speed: '~45 sn', quality: 'Yüksek',                      badge: 'bg-yellow-500/15 border-yellow-500/30 text-yellow-300' },
+  'gpt-image-1-5':             { speed: '~15 sn', quality: 'İyi',                         badge: 'bg-green-500/15 border-green-500/30 text-green-300' },
+  'gpt-image-2':               { speed: '~20 sn', quality: 'İyi',                         badge: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300' },
+  'ideogram-3':                { speed: '~30 sn', quality: 'Yüksek',                      badge: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300' },
+  'imagen-4-fast':             { speed: '~20 sn', quality: 'İyi',                         badge: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300' },
+  'imagen-4':                  { speed: '~35 sn', quality: 'Yüksek',                      badge: 'bg-yellow-500/15 border-yellow-500/30 text-yellow-300' },
+  'imagen-4-ultra':            { speed: '~60 sn', quality: 'Mükemmel',                    badge: 'bg-orange-500/15 border-orange-500/30 text-orange-300' },
+};
+
 function SettingsTab() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [models, setModels] = useState<ScaleModel[]>([]);
@@ -261,62 +280,158 @@ function SettingsTab() {
   }
 
   const imageModels = models.filter((m) => m.type === 'text-to-image');
+  const activeModelInfo = MODEL_SPEED_INFO[settings.scaleModel];
 
   return (
-    <div className="glass rounded-2xl border border-white/10 p-8 space-y-8 max-w-2xl">
-      <div>
-        <h2 className="text-lg font-semibold text-white mb-1">Görsel Üretim Motoru</h2>
-        <p className="text-white/40 text-sm mb-4">Hangi API ile görsel üretileceğini seçin.</p>
-        <div className="flex gap-3">
-          {(['vertex', 'scale'] as const).map((b) => (
-            <button
-              key={b}
-              onClick={() => save({ backend: b })}
-              className={`flex-1 py-3 rounded-2xl border text-sm font-semibold transition-all ${
-                settings.backend === b
-                  ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
-                  : 'glass border-white/10 text-white/40 hover:text-white hover:border-white/25'
-              }`}
-            >
-              {b === 'vertex' ? '⚡ Vertex (gemini-2.5-flash-image)' : '🌐 Scale (Nano Banana / Flux / …)'}
-            </button>
-          ))}
+    <div className="space-y-6 max-w-2xl">
+
+      {/* ─── Aktif Durum Kartı ─── */}
+      <div className={`glass rounded-2xl border p-5 flex items-center gap-4 ${
+        settings.backend === 'scale' ? 'border-green-500/25 bg-green-500/5' : 'border-cyan-500/25 bg-cyan-500/5'
+      }`}>
+        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl flex-shrink-0 ${
+          settings.backend === 'scale' ? 'bg-green-500/15' : 'bg-cyan-500/15'
+        }`}>
+          {settings.backend === 'scale' ? '🌐' : '⚡'}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-white font-bold">
+            {settings.backend === 'scale'
+              ? `Scale — ${imageModels.find(m => m.model === settings.scaleModel)?.name ?? settings.scaleModel}`
+              : 'Vertex — gemini-2.5-flash-image'}
+          </p>
+          <p className="text-white/40 text-xs mt-0.5">
+            {settings.backend === 'scale' && activeModelInfo
+              ? `⏱ ${activeModelInfo.speed} · Kalite: ${activeModelInfo.quality} · Boyut: 832–848x1264`
+              : '⏱ ~13 sn · Kalite: İyi · Boyut: 1024x1792 HD'}
+          </p>
+        </div>
+        <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+          settings.backend === 'scale' ? 'bg-green-500/20 border-green-500/40 text-green-300' : 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
+        }`}>Aktif</span>
+      </div>
+
+      {/* ─── Backend Seçimi ─── */}
+      <div className="glass rounded-2xl border border-white/10 p-6 space-y-4">
+        <div>
+          <h2 className="text-base font-bold text-white mb-1">Görsel Üretim Motoru</h2>
+          <p className="text-white/40 text-xs">Hangi API ile görsel üretileceğini seçin. Anında kaydedilir.</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {/* Scale — Önerilen */}
+          <button
+            onClick={() => save({ backend: 'scale' })}
+            className={`relative text-left p-4 rounded-2xl border transition-all ${
+              settings.backend === 'scale'
+                ? 'bg-green-500/15 border-green-500/40'
+                : 'glass border-white/10 hover:border-white/25'
+            }`}
+          >
+            {settings.backend === 'scale' && (
+              <span className="absolute -top-2 left-3 text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-bold">Aktif</span>
+            )}
+            <p className="text-2xl mb-2">🌐</p>
+            <p className="font-bold text-white text-sm">Scale API</p>
+            <p className="text-white/50 text-xs mt-1 leading-relaxed">
+              15 farklı model · Nano Banana dahil · <span className="text-green-400">Önerilen</span>
+            </p>
+            <p className="text-white/30 text-xs mt-1">En hızlı: ~11 sn (nano-banana)</p>
+          </button>
+
+          {/* Vertex — Yedek */}
+          <button
+            onClick={() => save({ backend: 'vertex' })}
+            className={`relative text-left p-4 rounded-2xl border transition-all ${
+              settings.backend === 'vertex'
+                ? 'bg-cyan-500/15 border-cyan-500/40'
+                : 'glass border-white/10 hover:border-white/25'
+            }`}
+          >
+            {settings.backend === 'vertex' && (
+              <span className="absolute -top-2 left-3 text-xs bg-cyan-500 text-white px-2 py-0.5 rounded-full font-bold">Aktif</span>
+            )}
+            <p className="text-2xl mb-2">⚡</p>
+            <p className="font-bold text-white text-sm">Vertex API</p>
+            <p className="text-white/50 text-xs mt-1 leading-relaxed">
+              Gemini 2.5 Flash Image · Senkron · Yedek
+            </p>
+            <p className="text-white/30 text-xs mt-1">~13 sn · 1024×1792 HD</p>
+          </button>
         </div>
       </div>
 
+      {/* ─── Scale Model Seçimi ─── */}
       {settings.backend === 'scale' && (
-        <div>
-          <h3 className="text-sm font-semibold text-white/70 mb-3">Scale Modeli</h3>
+        <div className="glass rounded-2xl border border-white/10 p-6 space-y-4">
+          <div>
+            <h3 className="text-base font-bold text-white mb-1">Scale Modeli Seç</h3>
+            <p className="text-white/40 text-xs">
+              🟢 Yeşil = Hızlı (&lt;20 sn) &nbsp;·&nbsp; 🟡 Sarı = Orta (20–50 sn) &nbsp;·&nbsp; 🟠 Turuncu = Yavaş (&gt;50 sn)
+            </p>
+          </div>
+
           {imageModels.length === 0 ? (
-            <p className="text-white/30 text-sm">Model listesi yüklenemedi (API key kontrol edin).</p>
+            <div className="text-center py-6">
+              <Loader2 className="w-6 h-6 animate-spin text-white/30 mx-auto mb-2" />
+              <p className="text-white/30 text-sm">Model listesi yükleniyor…</p>
+            </div>
           ) : (
-            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-              {imageModels.map((m) => (
-                <button
-                  key={m.model}
-                  onClick={() => save({ scaleModel: m.model })}
-                  className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
-                    settings.scaleModel === m.model
-                      ? 'bg-purple-500/20 border-purple-500/40 text-purple-200'
-                      : 'glass border-white/10 text-white/50 hover:text-white hover:border-white/25'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-sm">{m.name}</span>
-                    {settings.scaleModel === m.model && <Check className="w-4 h-4 text-purple-400" />}
-                  </div>
-                  <p className="text-xs mt-0.5 opacity-60 truncate">{m.description}</p>
-                </button>
-              ))}
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+              {imageModels.map((m) => {
+                const info = MODEL_SPEED_INFO[m.model];
+                const isSelected = settings.scaleModel === m.model;
+                return (
+                  <button
+                    key={m.model}
+                    onClick={() => save({ scaleModel: m.model })}
+                    className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
+                      isSelected
+                        ? 'bg-purple-500/20 border-purple-500/40'
+                        : 'glass border-white/10 hover:border-white/25'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`font-bold text-sm ${isSelected ? 'text-purple-200' : 'text-white/80'}`}>
+                          {m.name}
+                        </span>
+                        {info?.recommended && (
+                          <span className="flex-shrink-0 text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-bold">
+                            ÖNERİLEN
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {info && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${info.badge}`}>
+                            {info.speed}
+                          </span>
+                        )}
+                        {isSelected && <Check className="w-4 h-4 text-purple-400" />}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5">
+                      <p className={`text-xs opacity-50 truncate flex-1 ${isSelected ? 'text-purple-200' : 'text-white'}`}>
+                        {m.description || m.model}
+                      </p>
+                      {info && (
+                        <p className="text-xs text-white/25 flex-shrink-0">Kalite: {info.quality}</p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
       )}
 
-      <div className="flex items-center gap-3 pt-2 border-t border-white/10">
-        {saving && <Loader2 className="w-4 h-4 animate-spin text-white/40" />}
+      {/* ─── Kaydet göstergesi ─── */}
+      <div className="flex items-center gap-3">
+        {saving && <><Loader2 className="w-4 h-4 animate-spin text-white/40" /><span className="text-white/40 text-sm">Kaydediliyor…</span></>}
         {saved && <span className="text-green-400 text-sm flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Kaydedildi</span>}
-        <p className="text-white/25 text-xs ml-auto">Seçim anında kaydedilir</p>
+        {!saving && !saved && <p className="text-white/25 text-xs">Seçim anında sunucuya kaydedilir</p>}
       </div>
     </div>
   );
