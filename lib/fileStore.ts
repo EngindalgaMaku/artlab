@@ -71,7 +71,7 @@ async function saveLocalImage(id: string, b64: string): Promise<string> {
   await ensureGeneratedDir();
   const buf = Buffer.from(b64, 'base64');
   await fs.writeFile(path.join(GENERATED_DIR, `${id}.png`), buf);
-  return `/generated/${id}.png`;
+  return `/api/image/${id}`;
 }
 
 async function readLocalImage(id: string): Promise<string | null> {
