@@ -256,7 +256,7 @@ export default function GalleryPage() {
           </div>
           <h1 className="text-4xl md:text-6xl font-black neon-text mb-3">Sanat Galerisi</h1>
           <p className="text-white/40 text-lg">
-            Ziyaretçilerin 3 kelimesiyle doğan{' '}
+            Yapay zeka ile hayat bulan{' '}
             <span className="text-cyan-400 font-semibold">{items.length} eser</span>
           </p>
         </div>
