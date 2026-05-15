@@ -9,9 +9,9 @@ import { getById } from '@/lib/pendingStore';
  */
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = params;
+  const { id } = await params;
 
   // File store first (persistent), fallback to in-memory
   const item = (await getByIdFile(id).catch(() => null)) ?? getById(id);
