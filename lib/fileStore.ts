@@ -229,9 +229,8 @@ export async function deleteItemFile(id: string): Promise<boolean> {
   const item = items[idx];
   items.splice(idx, 1);
   await writeLocalFile(items);
-  if (item.imagePath) {
-    const filePath = path.join(process.cwd(), 'public', item.imagePath);
-    await fs.unlink(filePath).catch(() => {});
-  }
+  // Disk'teki PNG dosyasını sil (imagePath format değişse bile id'den bul)
+  const pngPath = path.join(GENERATED_DIR, `${item.id}.png`);
+  await fs.unlink(pngPath).catch(() => {});
   return true;
 }

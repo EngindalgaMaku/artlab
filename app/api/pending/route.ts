@@ -3,17 +3,23 @@ import { getPending, updateStatus, deleteItem } from '@/lib/pendingStore';
 import { getPendingFile, updateStatusFile, deleteItemFile } from '@/lib/fileStore';
 import type { PendingItem } from '@/lib/pendingStore';
 
-// GET /api/pending — kuyruğu getir (dosya öncelikli, fallback bellek)
+// GET /api/pending — dosya + bellek birleştir (kayıp item olmasın)
 export async function GET() {
+  let fileItems: PendingItem[] = [];
   try {
-    const fileItems = await getPendingFile();
-    if (fileItems.length > 0) {
-      return NextResponse.json({ items: fileItems });
-    }
+    fileItems = await getPendingFile();
   } catch {
-    // dosya yoksa belleği kullan
+    // dosya okunamazsa boş bırak
   }
-  return NextResponse.json({ items: getPending() });
+
+  const memItems = getPending();
+
+  // Dosyada olmayan memory item'larını ekle (yazma hatası durumunda kayıp olmasın)
+  const fileIds = new Set(fileItems.map((i) => i.id));
+  const extraMem = memItems.filter((i) => !fileIds.has(i.id));
+
+  const merged = [...fileItems, ...extraMem];
+  return NextResponse.json({ items: merged });
 }
 
 // PATCH /api/pending — onayla veya reddet
