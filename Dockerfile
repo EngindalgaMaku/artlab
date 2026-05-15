@@ -28,8 +28,8 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 
-# Data klasörü (submissions.json için)
-RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
+# Data ve generated klasörleri (kalıcı dosyalar için)
+RUN mkdir -p /app/data /app/public/generated && chown -R nextjs:nodejs /app/data /app/public/generated
 
 USER nextjs
 
