@@ -34,7 +34,7 @@ export default function Navbar() {
     <nav className="sticky top-0 z-50 glass border-b border-white/10">
       <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
         {/* Left: Logo + Title */}
-        <div className="flex items-center gap-3">
+        <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-purple-600 flex items-center justify-center">
             <Zap className="w-5 h-5 text-white" />
           </div>
@@ -43,7 +43,7 @@ export default function Navbar() {
             <span className="text-xs text-cyan-400 leading-none">TÜBİTAK 4006 • 2026</span>
             <span className="text-xs text-white/30 leading-none block">Hüsniye Özdilek Ticaret MTAL</span>
           </div>
-        </div>
+        </a>
 
         {/* Center: Nav links */}
         <div className="hidden md:flex items-center gap-6 text-sm font-medium">
